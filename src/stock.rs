@@ -1,3 +1,5 @@
+use std::error::Error;
+
 use chrono::{DateTime, Utc};
 use crate::settings::SETTINGS;
 
@@ -8,10 +10,14 @@ pub struct Stock {
 }
 
 impl Stock {
-    pub fn new(name: &str) -> Stock {
-        Stock {
+    pub async fn new(name: &str) -> Result<Stock, Box<dyn Error>> {
+
+        let s = Stock {
             name: String::from(name),
-        }
+        };
+        s.price(Utc::now()).await?;
+
+        Ok(s)
     }
     
     pub fn name(&self) -> &str {
@@ -19,7 +25,7 @@ impl Stock {
     }
 
     /// Returns the latest closing price available of the stock at the given date.
-    pub async fn price(&self, date: DateTime<Utc>) -> Result<f32, Box< dyn std::error::Error>> {        
+    pub async fn price(&self, date: DateTime<Utc>) -> Result<f32, Box<dyn Error>> {        
 
         let url = format!(
             "https://finnhub.io/api/v1/stock/candle?symbol={}&resolution={}&from={}&to={}&token={}",
@@ -34,11 +40,20 @@ impl Stock {
         let body = response.text().await?;
         let json: serde_json::Value = serde_json::from_str(&body).unwrap();
 
+        if json["s"] == "no_data" {
+            return Err(Box::new(
+                std::io::Error::new(
+                    std::io::ErrorKind::Other, 
+                    format!("No data for {} on {}", self.name, date)
+                ))
+            );
+        }
+
         let last_closing_price = json["c"].as_array().unwrap()
             .last().unwrap()
             .as_f64().unwrap();
 
-        return Ok(last_closing_price as f32)
+        Ok(last_closing_price as f32)
     }
 
     
@@ -73,22 +88,31 @@ impl Stock {
 mod test {
     use super::*;
 
-    #[test]
-    fn new() {
-        let stock = Stock::new("GOOG");
-        assert_eq!(stock.name, "GOOG");
+    #[tokio::test]
+    async fn new_valid() {
+        let stock = Stock::new("GOOG").await;
+
+        assert!(stock.is_ok());
+        assert_eq!(stock.unwrap().name, "GOOG");
+    }
+
+    #[tokio::test]
+    async fn new_invalid() {
+        let stock = Stock::new("GOOH").await;
+
+        assert!(stock.is_err());
     }
 
     #[tokio::test]
     async fn price_is_positive() {
-        let stock = Stock::new("GOOG");
+        let stock = Stock::new("GOOG").await.unwrap();
         let price = stock.price(Utc::now()).await.unwrap();
         assert!(price > 0.0);
     }
 
     #[tokio::test]
     async fn prices_has_multiple_values() {
-        let stock = Stock::new("GOOG");
+        let stock = Stock::new("GOOG").await.unwrap();
         let prices = stock.prices(Utc::now() - chrono::Duration::days(30), Utc::now()).await.unwrap();
         assert!(prices.len() > 20);
     }

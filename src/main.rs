@@ -12,13 +12,14 @@ async fn main() {
     let portfolio = Portfolio::from(
         vec![
             ("GOOG", 0.30), 
-            ("AAPL", 0.20), 
-            ("MSFT", 0.50)
+            ("AAPL", 0.50), 
+            ("AMZN", 0.20)
         ],
         1000.0)
+        .await
         .unwrap();
     
-    let from = Utc::now() - chrono::Duration::days(50);
+    let from = Utc::now() - chrono::Duration::days(200);
     let to = Utc::now();
 
     let profit = portfolio.profit(from, to).await;

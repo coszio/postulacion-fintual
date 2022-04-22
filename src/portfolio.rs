@@ -1,5 +1,5 @@
 
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use chrono::{DateTime, Utc};
 
@@ -21,12 +21,15 @@ impl Portfolio {
     /// * `stocks` - A vector of tuples `[(stock_name, participation), ...]` containing the stock names and their participation in the portfolio.
     /// * `investment` - The investment in dollars.
     /// 
-    pub fn from(stocks: Vec<(&str, f32)>, investment: f32) -> Result<Portfolio, Box<dyn std::error::Error>> {
-        let stocks: HashMap<Stock, f32> = stocks
-                .iter()
-                .map(|(k, v)| (Stock::new(k), *v))
-                .collect();
-
+    pub async fn from(stocks: Vec<(&str, f32)>, investment: f32) -> Result<Portfolio, Box<dyn std::error::Error>> {
+        // let stocks: HashMap<Stock, f32> = await!(stocks
+            //         .iter()
+            //         .map(|(k, v)| async {
+                //             let s = Stock::new(k.clone());
+                //             (s, v)
+                //         })
+                //         .collect());
+                
         let total_participation: f32 = stocks.iter().map(|(_, v)| *v).sum();
 
         if total_participation != 1.0 {
@@ -36,10 +39,17 @@ impl Portfolio {
                     format!("Total participation must be 1.0, got {}", total_participation)
                 ))
             );
+        }  
+
+        let mut portfolio_stocks: HashMap<Stock, f32> = HashMap::new();
+        for (name, part) in stocks.iter() {
+            let s = Stock::new(name).await?;
+            portfolio_stocks.insert(s, *part);
         }
+        
 
         Ok(Portfolio {
-            stocks,
+            stocks: portfolio_stocks,
             investment,
         })
     }
@@ -98,15 +108,16 @@ impl Portfolio {
 mod test {
     use super::*;
 
-    #[test]
-    fn from_checks_total_percentage() {
+    #[tokio::test]
+    async fn from_checks_total_percentage() {
         let portfolio = Portfolio::from(
             vec![
                 ("GOOG", 0.30), 
                 ("AAPL", 0.20), 
                 ("MSFT", 0.50)
             ],
-            1000.0);
+            1000.0)
+            .await;
 
         assert!(portfolio.is_ok());
         assert_eq!(portfolio.unwrap().stocks.len(), 3);
@@ -117,12 +128,13 @@ mod test {
                 ("AAPL", 0.20), 
                 ("MSFT", 0.10)
             ],
-            1000.0);
+            1000.0)
+            .await;
         assert!(portfolio.is_err());
     }
 
-    #[test]
-    fn stocks_has_items() {
+    #[tokio::test]
+    async fn stocks_has_items() {
         let portfolio = Portfolio::from(
             vec![
                 ("GOOG", 0.30), 
@@ -130,6 +142,7 @@ mod test {
                 ("MSFT", 0.50)
             ],
             1000.0)
+            .await
             .unwrap();
 
         assert_eq!(portfolio.stocks().len(), 3);
@@ -144,6 +157,7 @@ mod test {
                 ("MSFT", 0.50)
             ],
             1000.0)
+            .await
             .unwrap();
 
         let from = Utc::now() - chrono::Duration::days(5);
@@ -162,6 +176,7 @@ mod test {
                 ("MSFT", 0.50)
             ],
             1000.0)
+            .await
             .unwrap();
 
         let from = Utc::now() - chrono::Duration::days(365);

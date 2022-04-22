@@ -22,13 +22,6 @@ impl Portfolio {
     /// * `investment` - The investment in dollars.
     /// 
     pub async fn from(stocks: Vec<(&str, f32)>, investment: f32) -> Result<Portfolio, Box<dyn std::error::Error>> {
-        // let stocks: HashMap<Stock, f32> = await!(stocks
-            //         .iter()
-            //         .map(|(k, v)| async {
-                //             let s = Stock::new(k.clone());
-                //             (s, v)
-                //         })
-                //         .collect());
                 
         let total_participation: f32 = stocks.iter().map(|(_, v)| *v).sum();
 
@@ -63,9 +56,15 @@ impl Portfolio {
         let mut profit: f32 = 0.0;
 
         for (stock, &participation) in self.stocks.iter() {
-            let this_return = stock.price(to).await.unwrap() / stock.price(from).await.unwrap() - 1.0;
+
+            let price_from = stock.price(from).await.unwrap();
+            let price_to = stock.price(to).await.unwrap();
+            
+            let this_return = price_to / price_from - 1.0;
             let this_profit = this_return * self.investment;
+
             profit += this_profit * participation;
+            
         }
 
         profit

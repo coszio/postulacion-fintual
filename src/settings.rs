@@ -22,7 +22,6 @@ pub struct Settings {
 impl Settings {
     pub fn new() -> Result<Self, ConfigError> {
         let settings = Config::builder()
-        // Add in `./Settings.toml`
         .add_source(config::File::with_name(CONFIG_FILE_PATH))
         .build()?;
 
